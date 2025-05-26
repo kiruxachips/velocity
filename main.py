@@ -16,6 +16,10 @@ from aiogram.types import (
     ContentType,
 )
 
+from aiogram.fsm.storage.memory import MemoryStorage
+from aiogram import Dispatcher
+from quiz import register_quiz
+
 logging.basicConfig(level=logging.INFO)
 
 async def main():
@@ -28,7 +32,8 @@ async def main():
         token=config.TELEGRAM_TOKEN,
         default=DefaultBotProperties(parse_mode="HTML")
     )
-    dp = Dispatcher()
+    storage = MemoryStorage()
+    dp = Dispatcher(storage=storage)
 
     # Стартовое меню
     @dp.message(Command("start"))
@@ -142,7 +147,9 @@ async def main():
             "Нажмите кнопку ниже, чтобы оплатить:",
             reply_markup=kb
         )
-
+        
+    register_quiz(dp)
+    
     logging.info("🚀 Velocity-бот запущен")
     await dp.start_polling(bot, skip_updates=True)
 
