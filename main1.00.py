@@ -6,88 +6,78 @@ import logging
 from yookassa import Configuration, Payment
 import config
 
-from aiogram import types
+from aiogram import F, Dispatcher, types
 from aiogram.client.bot import Bot, DefaultBotProperties
 from aiogram.filters import Command
 from aiogram.types import (
     InlineKeyboardButton,
     InlineKeyboardMarkup,
     WebAppInfo,
-    ReplyKeyboardMarkup,
-    KeyboardButton,
+    ContentType,
 )
+
 from aiogram.fsm.storage.memory import MemoryStorage
 from aiogram import Dispatcher
-
 from quiz import register_quiz
+
+from aiogram.types import ReplyKeyboardMarkup, KeyboardButton
+
+reply_kb = ReplyKeyboardMarkup(
+    keyboard=[
+        [
+            KeyboardButton(text="/start"),     # сразу команда /start
+            KeyboardButton(text="Подбор курса")  # любая другая кнопка
+        ]
+    ],
+    resize_keyboard=True,      # подгоняет размер под экран
+    one_time_keyboard=False    # клавиатура не исчезает после нажатия
+)
 
 logging.basicConfig(level=logging.INFO)
 
-# 1) Reply-клавиатура с кнопкой "Меню"
-menu_reply_kb = ReplyKeyboardMarkup(
-    keyboard=[
-        [ KeyboardButton(text="Меню") ]
-    ],
-    resize_keyboard=True,
-    one_time_keyboard=False,
-)
-
-# 2) Фабрика Inline-клавиатуры
-def get_main_inline_kb() -> InlineKeyboardMarkup:
-    return InlineKeyboardMarkup(inline_keyboard=[
-        [
-            InlineKeyboardButton(text="📚 Подбор курса", callback_data="quiz_start"),
-            InlineKeyboardButton(
-                text="🎓 Курсы",
-                web_app=WebAppInfo(url="https://velocityschool.store/")
-            ),
-            InlineKeyboardButton(text="📞 Контакты", callback_data="menu:contacts"),
-        ],
-        [
-            InlineKeyboardButton(text="ℹ️ О нас", callback_data="menu:about"),
-            InlineKeyboardButton(text="🔗 Полезные", callback_data="menu:links"),
-        ],
-        [
-            InlineKeyboardButton(text="🗑 Очистить чат", callback_data="menu:clear"),
-        ],
-    ])
-
 async def main():
-    # 3) Настройка YooKassa SDK
+    # Настройка SDK YooKassa
     Configuration.account_id = config.YOOKASSA_SHOP_ID
     Configuration.secret_key = config.YOOKASSA_SECRET_KEY
 
-    # 4) Инициализация бота
+    # Инициализация бота с HTML-парсингом
     bot = Bot(
         token=config.TELEGRAM_TOKEN,
         default=DefaultBotProperties(parse_mode="HTML")
     )
-    dp = Dispatcher(storage=MemoryStorage())
+    storage = MemoryStorage()
+    dp = Dispatcher(storage=storage)
 
-    # 5) /start — показывает inline-меню и Reply-кнопку "Меню"
+    # Стартовое меню
     @dp.message(Command("start"))
     async def cmd_start(message: types.Message):
+        keyboard = InlineKeyboardMarkup(inline_keyboard=[
+            [
+                InlineKeyboardButton(text="📚 Подбор курса", callback_data="quiz_start"),
+                InlineKeyboardButton(
+                text="🎓 Курсы",
+                web_app=WebAppInfo(url="https://velocityschool.store/")
+    ),
+                InlineKeyboardButton(text="📞 Контакты", callback_data="menu:contacts"),
+            ],
+            [
+                InlineKeyboardButton(text="ℹ️ О нас", callback_data="menu:about"),
+                InlineKeyboardButton(text="🔗 Полезные", callback_data="menu:links"),
+            ],
+            [
+                InlineKeyboardButton(text="🗑 Очистить чат", callback_data="menu:clear"),
+            ],
+        ])
         await message.answer(
             "👋 Привет! Это бот школы <b>Velocity</b>.\nВыберите раздел:",
-            reply_markup=get_main_inline_kb()
-        )
-        await message.answer(
-            "👉 В любой момент нажмите «Меню» внизу, чтобы открыть это меню снова.",
-            reply_markup=menu_reply_kb
+            reply_markup=keyboard
         )
 
-    # 6) Кнопка Reply-клавиатуры "Меню"
-    @dp.message(lambda m: m.text == "Меню")
-    async def on_menu_button(message: types.Message):
-        # просто переиспользуем логику /start
-        await cmd_start(message)
-
-    # 7) Обработка пунктов inline-меню
+    # Обработка пунктов меню
     @dp.callback_query(lambda c: c.data and c.data.startswith("menu:"))
     async def menu_router(cq: types.CallbackQuery):
-        await cq.answer()
         action = cq.data.split(":", 1)[1]
-
+        await cq.answer()
         if action == "contacts":
             await cq.message.answer(
                 "📞 <b>Контакты</b>\n"
@@ -112,15 +102,15 @@ async def main():
                 reply_markup=links_kb
             )
         else:  # clear
-            # убираем inline-кнопки и сообщаем об очистке
             await cq.message.edit_reply_markup(None)
             await cq.message.answer("🧹 Чат очищен.")
 
-    # 8) Обработка WebApp-данных и создание платежа
+    # Приём данных из WebApp и создание платежа вручную
     @dp.message(lambda m: m.web_app_data is not None)
     async def webapp_handler(message: types.Message):
         logging.info("🕵️‍♂️ web_app_data arrived: %r", message.web_app_data.data)
         data_str = message.web_app_data.data
+        logging.info(f"Получены данные из WebApp: {data_str}")
 
         try:
             course_key, tariff_key = data_str.split(":", 1)
@@ -138,13 +128,14 @@ async def main():
             "sound_designer": {"pro": 40000, "intro": 28000, "single": 2500},
         }
 
-        if course_key not in titles or tariff_key not in prices_map.get(course_key, {}):
+        if course_key not in titles or tariff_key not in prices_map[course_key]:
             return await message.answer("❌ Неизвестный курс или тариф.")
 
         title = titles[course_key]
         label = tariff_key.upper() if tariff_key != "single" else "Разовый"
         amount = prices_map[course_key][tariff_key]
 
+        # Создаём платёж в YooKassa
         payment = Payment.create({
             "amount": {
                 "value": f"{amount:.2f}",
@@ -158,8 +149,9 @@ async def main():
             "description": f"{title} — {label}"
         })
 
+        # Кнопка с ссылкой на шлюз оплаты
         pay_url = payment.confirmation.confirmation_url
-        pay_kb = InlineKeyboardMarkup(inline_keyboard=[
+        kb = InlineKeyboardMarkup(inline_keyboard=[
             [InlineKeyboardButton(text="Перейти к оплате", url=pay_url)]
         ])
 
@@ -167,15 +159,13 @@ async def main():
             f"Ваш заказ: <b>{title} — {label}</b>\n"
             f"Сумма: <b>{amount} ₽</b>\n\n"
             "Нажмите кнопку ниже, чтобы оплатить:",
-            reply_markup=pay_kb
+            reply_markup=kb
         )
-
-    # 9) Регистрируем викторину из quiz.py
+        
     register_quiz(dp)
-
+    
     logging.info("🚀 Velocity-бот запущен")
     await dp.start_polling(bot, skip_updates=True)
-
 
 if __name__ == "__main__":
     asyncio.run(main())
