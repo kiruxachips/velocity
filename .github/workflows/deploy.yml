@@ -40,7 +40,7 @@ jobs:
         with:
           host: 46.173.27.175
           username: root
-          key: SHA256:yxhO6rMjFVN1RSS89ck1u3V5KUyWw/wZDM4nC24vaJQ
+          key: ${{ secrets.SERVER_SSH_KEY }}
           port: 22
           script: |
             cd /home/velocity_bot
