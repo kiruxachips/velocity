@@ -1,6 +1,5 @@
 name: CI & Deploy Bot
 
-# Запускать при пуше в main (или другую ветку)
 on:
   push:
     branches: [ main ]
@@ -10,26 +9,38 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # 1) Скачиваем код
+      # 1) Checkout
       - name: Checkout code
         uses: actions/checkout@v3
 
-      # 2) Устанавливаем зависимости и запускаем тесты
-      - name: Install & Test
-        run: |
-          npm install
-          npm test
+      # 2) Устанавливаем Python
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.x'
 
-      # 3) Деплой на сервер по SSH
+      # 3) Устанавливаем зависимости
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      # 4) Запускаем ваши тесты (если есть pytest/unittest)
+      - name: Run tests
+        # замените на вашу команду запуска тестов
+        run: |
+          pytest --maxfail=1 --disable-warnings -q
+
+      # 5) Деплой по SSH
       - name: Deploy via SSH
         uses: appleboy/ssh-action@v0.1.7
         with:
-          host: 46.173.27.175 
+          host: 46.173.27.175
           username: root
           key: SHA256:yxhO6rMjFVN1RSS89ck1u3V5KUyWw/wZDM4nC24vaJQ
           port: 22
           script: |
             cd /home/velocity_bot
             git pull origin main
-            npm install
-            pm2 restart velocity_bot
+            pip install -r requirements.txt
+            sudo systemctl restart velocity_bot
