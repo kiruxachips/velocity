@@ -40,7 +40,7 @@ async def main():
     async def cmd_start(message: types.Message):
         keyboard = InlineKeyboardMarkup(inline_keyboard=[
             [
-                InlineKeyboardButton(text="🎓 Подбор курса", callback_data="quiz_start"),
+                InlineKeyboardButton(text="📚 Подбор курса", callback_data="quiz_start"),
                 InlineKeyboardButton(
                 text="🎓 Курсы",
                 web_app=WebAppInfo(url="https://velocityschool.store/")
@@ -69,7 +69,7 @@ async def main():
             await cq.message.answer(
                 "📞 <b>Контакты</b>\n"
                 "Telegram: @cookedbychief\n"
-                "E-mail: support@velocity.ru\n"
+                "E-mail: support@velocityschool.ru\n"
                 "Телефон: +7 963 299-87-02"
             )
         elif action == "about":
@@ -81,7 +81,7 @@ async def main():
         elif action == "links":
             links_kb = InlineKeyboardMarkup(inline_keyboard=[
                 [InlineKeyboardButton(text="🌐 Наш сайт", url="https://velocityschool.ru/")],
-                [InlineKeyboardButton(text="📚 Дзен", url="https://youtube.com/velocity")],
+                [InlineKeyboardButton(text="📚 Дзен", url="https://dzen.ru/velocity")],
                 [InlineKeyboardButton(text="📱 Instagram", url="https://instagram.com/velocity")],
             ])
             await cq.message.answer(
