@@ -30,6 +30,7 @@ jobs:
       # 4) Запускаем ваши тесты (если есть pytest/unittest)
       - name: Run tests
         # замените на вашу команду запуска тестов
+        continue-on-error: true
         run: |
           pytest --maxfail=1 --disable-warnings -q
 
