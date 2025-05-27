@@ -34,6 +34,14 @@ jobs:
         run: |
           pytest --maxfail=1 --disable-warnings -q
 
+      - name: Debug SSH key header
+        run: |
+          echo "SSH key first line:"
+          echo "$SSH_KEY" | head -n1
+        env:
+          SSH_KEY: ${{ secrets.SERVER_SSH_KEY }}
+
+
       # 5) Деплой по SSH
       - name: Deploy via SSH
         uses: appleboy/ssh-action@v0.1.7
