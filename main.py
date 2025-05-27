@@ -40,10 +40,11 @@ async def main():
     async def cmd_start(message: types.Message):
         keyboard = InlineKeyboardMarkup(inline_keyboard=[
             [
+                InlineKeyboardButton(text="🎓 Подбор курса", callback_data="quiz_start"),
                 InlineKeyboardButton(
-                    text="🎓 Курсы",
-                    web_app=WebAppInfo(url="https://velocityschool.store/")
-                ),
+                text="🎓 Курсы",
+                web_app=WebAppInfo(url="https://velocityschool.store/")
+    ),
                 InlineKeyboardButton(text="📞 Контакты", callback_data="menu:contacts"),
             ],
             [
