@@ -1,0 +1,35 @@
+name: CI & Deploy Bot
+
+# Запускать при пуше в main (или другую ветку)
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      # 1) Скачиваем код
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      # 2) Устанавливаем зависимости и запускаем тесты
+      - name: Install & Test
+        run: |
+          npm install
+          npm test
+
+      # 3) Деплой на сервер по SSH
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v0.1.7
+        with:
+          host: 46.173.27.175 
+          username: root
+          key: SHA256:yxhO6rMjFVN1RSS89ck1u3V5KUyWw/wZDM4nC24vaJQ
+          port: 22
+          script: |
+            cd /home/velocity_bot
+            git pull origin main
+            npm install
+            pm2 restart velocity_bot
