@@ -1,0 +1,12 @@
+# Игнорировать конфиг с токенами
+config.py
+.env
+
+# Кэш и временные файлы Python
+__pycache__/
+*.py[cod]
+*.log
+
+# VSCode и IDE-шные файлы
+.vscode/
+.idea/
