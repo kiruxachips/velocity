@@ -55,5 +55,5 @@ jobs:
           pip install -r requirements.txt
 
           # ⬇︎ 3. рестартуем службу
-          systemctl restart velocity-bot.service
+          systemctl restart velocitybot.service
 
