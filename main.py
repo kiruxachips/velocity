@@ -7,7 +7,7 @@ from yookassa import Configuration, Payment
 import config
 
 from aiogram import types
-from aiogram.client.bot import Bot, DefaultBotProperties
+from aiogram.client.bot import Bot
 from aiogram.filters import Command
 from aiogram.types import (
     InlineKeyboardButton,
@@ -18,6 +18,7 @@ from aiogram.types import (
 )
 from aiogram.fsm.storage.memory import MemoryStorage
 from aiogram import Dispatcher
+from aiogram.client.default import DefaultBotProperties
 
 from quiz import register_quiz
 
@@ -58,6 +59,8 @@ async def main():
     Configuration.secret_key = config.YOOKASSA_SECRET_KEY
 
     # 4) Инициализация бота
+    if config.TELEGRAM_TOKEN is None:
+        raise ValueError("TELEGRAM_TOKEN не задан в config.py")
     bot = Bot(
         token=config.TELEGRAM_TOKEN,
         default=DefaultBotProperties(parse_mode="HTML")
@@ -86,7 +89,12 @@ async def main():
     @dp.callback_query(lambda c: c.data and c.data.startswith("menu:"))
     async def menu_router(cq: types.CallbackQuery):
         await cq.answer()
+        if not cq.data:
+            return
         action = cq.data.split(":", 1)[1]
+
+        if not cq.message:
+            return
 
         if action == "contacts":
             await cq.message.answer(
@@ -113,14 +121,15 @@ async def main():
             )
         else:  # clear
             # убираем inline-кнопки и сообщаем об очистке
-            await cq.message.edit_reply_markup(None)
             await cq.message.answer("🧹 Чат очищен.")
 
     # 8) Обработка WebApp-данных и создание платежа
     @dp.message(lambda m: m.web_app_data is not None)
     async def webapp_handler(message: types.Message):
-        logging.info("🕵️‍♂️ web_app_data arrived: %r", message.web_app_data.data)
-        data_str = message.web_app_data.data
+        data_str = getattr(getattr(message, "web_app_data", None), "data", None)
+        logging.info("🕵️‍♂️ web_app_data arrived: %r", data_str)
+        if not data_str:
+            return await message.answer("❌ Некорректные данные от WebApp.")
 
         try:
             course_key, tariff_key = data_str.split(":", 1)
@@ -158,7 +167,11 @@ async def main():
             "description": f"{title} — {label}"
         })
 
-        pay_url = payment.confirmation.confirmation_url
+        pay_url = None
+        if payment and hasattr(payment, "confirmation") and payment.confirmation:
+            pay_url = getattr(payment.confirmation, "confirmation_url", None)
+        if not pay_url:
+            return await message.answer("❌ Не удалось создать ссылку на оплату. Попробуйте позже.")
         pay_kb = InlineKeyboardMarkup(inline_keyboard=[
             [InlineKeyboardButton(text="Перейти к оплате", url=pay_url)]
         ])
