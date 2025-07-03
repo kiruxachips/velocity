@@ -2,61 +2,58 @@ name: CI & Deploy Bot
 
 on:
   push:
-    branches: [ main ]
+    branches: [ main ]          # деплой только из ветки main
 
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
 
     steps:
-      # 1) Checkout
-      - name: Checkout code
-        uses: actions/checkout@v3
+    # 1) Забираем код, чтобы запустить локальные тесты (опц.)
+    - name: Checkout repository
+      uses: actions/checkout@v3
 
-      # 2) Устанавливаем Python
-      - name: Set up Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: '3.x'
+    # 2) Ставим Python – нужен только для тестов на runner’е
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.x'
 
-      # 3) Устанавливаем зависимости
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt
-          pip install pytest
+    # 3) Ставим зависимости и (опц.) запускаем pytest
+    - name: Install dependencies & run tests
+      run: |
+        python -m pip install -U pip
+        pip install -r requirements.txt
+        # убери следующую строку, если тестов нет
+        pytest -q || true                # не валим workflow, если тесты падают
 
+    # 4) Деплой на Beget по SSH
+    - name: Deploy via SSH
+      uses: appleboy/ssh-action@v0.1.7
+      with:
+        host: 46.173.27.175
+        username: root
+        key: ${{ secrets.SERVER_SSH_KEY }}
+        script: |
+          set -e                            # если любая команда упадёт → красный билд
 
-      # 4) Запускаем ваши тесты (если есть pytest/unittest)
-      - name: Run tests
-        # замените на вашу команду запуска тестов
-        continue-on-error: true
-        run: |
-          pytest --maxfail=1 --disable-warnings -q
-
-      - name: Debug SSH key header
-        run: |
-          echo "SSH key first line:"
-          echo "$SSH_KEY" | head -n1
-        env:
-          SSH_KEY: ${{ secrets.SERVER_SSH_KEY }}
-
-
-      # 5) Деплой по SSH
-      - name: Deploy via SSH
-        uses: appleboy/ssh-action@v0.1.7
-        with:
-          host: 46.173.27.175
-          username: root
-          key: ${{ secrets.SERVER_SSH_KEY }}
-          port: 22
-          script: |
+          # ⬇︎ 1. кладём/обновляем репозиторий
+          if [ ! -d /home/velocity_bot/.git ]; then
+            git clone [email protected]:kiruxachips/velocity.git /home/velocity_bot
+          else
             cd /home/velocity_bot
             git pull origin main
+          fi
 
+          # ⬇︎ 2. создаём venv один раз и обновляем зависимости
+          cd /home/velocity_bot
+          if [ ! -d venv ]; then
             python3 -m venv venv
-            source venv/bin/activate
-            pip install --upgrade pip
-            pip install -r requirements.txt
+          fi
+          source venv/bin/activate
+          pip install -U pip
+          pip install -r requirements.txt
 
-            sudo systemctl restart velocitybot.service
+          # ⬇︎ 3. рестартуем службу
+          systemctl restart velocity-bot.service
+
