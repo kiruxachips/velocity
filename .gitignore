@@ -10,3 +10,6 @@ __pycache__/
 # VSCode и IDE-шные файлы
 .vscode/
 .idea/
+
+.venv/
+venv/
