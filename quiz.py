@@ -5,7 +5,7 @@
 """
 from collections import Counter
 
-from aiogram import types, Dispatcher
+from aiogram import types, Dispatcher, Bot
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import StatesGroup, State
@@ -19,36 +19,36 @@ class QuizStates(StatesGroup):
     q4     = State()  # вопрос 4
 
 
-def register_quiz(dp: Dispatcher) -> None:
+def register_quiz(dp: Dispatcher, bot: Bot) -> None:
     """
     Регистрирует хендлеры для квиза в диспетчере dp.
     """
 
     @dp.callback_query(lambda c: c.data == 'quiz_start')
     async def quiz_start(cq: types.CallbackQuery, state: FSMContext):
-        await cq.answer()
-        # Инициализация хранения ответов
+        if cq:
+            await cq.answer()
         await state.update_data(answers={})
         await state.set_state(QuizStates.branch)
-        # Первый вопрос
         kb = InlineKeyboardMarkup(inline_keyboard=[
             [InlineKeyboardButton(text="🔊 Управлять звуком", callback_data="sound")],
             [InlineKeyboardButton(text="🎨 Управлять визуалом", callback_data="visual")],
         ])
-        await cq.message.answer(
+        await bot.send_message(
+            cq.from_user.id,
             "📍 Ты стоишь на старте. Тебе дают суперсилу. Какую выберешь?",
             reply_markup=kb
         )
 
     @dp.callback_query(StateFilter(QuizStates.branch))
     async def branch_chosen(cq: types.CallbackQuery, state: FSMContext):
-        await cq.answer()
+        if cq:
+            await cq.answer()
         choice = cq.data  # 'sound' или 'visual'
         data = await state.get_data()
         data['answers']['branch'] = choice
         await state.update_data(data)
 
-        # Следующий вопрос в зависимости от ветки
         if choice == 'sound':
             kb = InlineKeyboardMarkup(inline_keyboard=[
                 [InlineKeyboardButton(text="🎵 Делать музыку с нуля", callback_data="beatmaking")],
@@ -64,12 +64,13 @@ def register_quiz(dp: Dispatcher) -> None:
             ])
             text = "🧩 Какие образы вызывают у тебя больше интереса?"
 
-        await cq.message.answer(text, reply_markup=kb)
+        await bot.send_message(cq.from_user.id, text, reply_markup=kb)
         await state.set_state(QuizStates.q2)
 
     @dp.callback_query(StateFilter(QuizStates.q2))
     async def q2_handler(cq: types.CallbackQuery, state: FSMContext):
-        await cq.answer()
+        if cq:
+            await cq.answer()
         choice = cq.data
         data = await state.get_data()
         data['answers']['q2'] = choice
@@ -91,12 +92,13 @@ def register_quiz(dp: Dispatcher) -> None:
             ])
             text = "🛠 Что тебе ближе?"
 
-        await cq.message.answer(text, reply_markup=kb)
+        await bot.send_message(cq.from_user.id, text, reply_markup=kb)
         await state.set_state(QuizStates.q3)
 
     @dp.callback_query(StateFilter(QuizStates.q3))
     async def q3_handler(cq: types.CallbackQuery, state: FSMContext):
-        await cq.answer()
+        if cq:
+            await cq.answer()
         choice = cq.data
         data = await state.get_data()
         data['answers']['q3'] = choice
@@ -118,12 +120,13 @@ def register_quiz(dp: Dispatcher) -> None:
             ])
             text = "📚 С чем ты уже сталкивался?"
 
-        await cq.message.answer(text, reply_markup=kb)
+        await bot.send_message(cq.from_user.id, text, reply_markup=kb)
         await state.set_state(QuizStates.q4)
 
     @dp.callback_query(StateFilter(QuizStates.q4))
     async def q4_handler(cq: types.CallbackQuery, state: FSMContext):
-        await cq.answer()
+        if cq:
+            await cq.answer()
         choice = cq.data
         data = await state.get_data()
         data['answers']['q4'] = choice
@@ -156,7 +159,8 @@ def register_quiz(dp: Dispatcher) -> None:
         most_common = Counter(votes).most_common(1)[0][0]
         recommendation = course_map.get(most_common, '🎓 Наш курс')
 
-        await cq.message.answer(
+        await bot.send_message(
+            cq.from_user.id,
             f"🔥 Готов узнать больше?\nТебе подходит курс:\n👉 {recommendation}"
         )
         await state.clear()

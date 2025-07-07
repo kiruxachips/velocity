@@ -21,6 +21,7 @@ from aiogram import Dispatcher
 from aiogram.client.default import DefaultBotProperties
 
 from quiz import register_quiz
+import db_async
 
 logging.basicConfig(level=logging.INFO)
 
@@ -66,6 +67,14 @@ async def main():
         default=DefaultBotProperties(parse_mode="HTML")
     )
     dp = Dispatcher(storage=MemoryStorage())
+
+    # 0) Хуки для инициализации и закрытия пула
+    async def on_startup(dispatcher):
+        await db_async.init_pool()
+    async def on_shutdown(dispatcher):
+        await db_async.close_pool()
+    dp.startup.register(on_startup)
+    dp.shutdown.register(on_shutdown)
 
     # 5) /start — показывает inline-меню и Reply-кнопку "Меню"
     @dp.message(Command("start"))
@@ -184,7 +193,21 @@ async def main():
         )
 
     # 9) Регистрируем викторину из quiz.py
-    register_quiz(dp)
+    register_quiz(dp, bot)
+
+    # /mycourses — список купленных курсов пользователя
+    @dp.message(Command("mycourses"))
+    async def mycourses_handler(message: types.Message):
+        telegram_id = getattr(getattr(message, "from_user", None), "id", None)
+        if not telegram_id:
+            await message.answer("Не удалось определить ваш Telegram ID.")
+            return
+        courses = await db_async.fetch_user_courses(telegram_id)
+        if not courses:
+            await message.answer("У вас нет купленных курсов.")
+        else:
+            text = "<b>Ваши курсы:</b>\n" + "\n".join(f"• {c['title']}" for c in courses)
+            await message.answer(text)
 
     logging.info("🚀 Velocity-бот запущен")
     await dp.start_polling(bot, skip_updates=True)
