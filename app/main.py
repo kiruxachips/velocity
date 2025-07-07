@@ -20,8 +20,9 @@ from aiogram.fsm.storage.memory import MemoryStorage
 from aiogram import Dispatcher
 from aiogram.client.default import DefaultBotProperties
 
-from quiz import register_quiz
-import db_async
+from app.config.config import TELEGRAM_TOKEN, YOOKASSA_PROVIDER_TOKEN, YOOKASSA_SHOP_ID, YOOKASSA_SECRET_KEY
+from app.db.db_async import init_pool, close_pool, fetch_user_courses
+from app.handlers.quiz import register_quiz
 
 logging.basicConfig(level=logging.INFO)
 
@@ -56,23 +57,23 @@ def get_main_inline_kb() -> InlineKeyboardMarkup:
 
 async def main():
     # 3) Настройка YooKassa SDK
-    Configuration.account_id = config.YOOKASSA_SHOP_ID
-    Configuration.secret_key = config.YOOKASSA_SECRET_KEY
+    Configuration.account_id = YOOKASSA_SHOP_ID
+    Configuration.secret_key = YOOKASSA_SECRET_KEY
 
     # 4) Инициализация бота
-    if config.TELEGRAM_TOKEN is None:
+    if TELEGRAM_TOKEN is None:
         raise ValueError("TELEGRAM_TOKEN не задан в config.py")
     bot = Bot(
-        token=config.TELEGRAM_TOKEN,
+        token=TELEGRAM_TOKEN,
         default=DefaultBotProperties(parse_mode="HTML")
     )
     dp = Dispatcher(storage=MemoryStorage())
 
     # 0) Хуки для инициализации и закрытия пула
     async def on_startup(dispatcher):
-        await db_async.init_pool()
+        await init_pool()
     async def on_shutdown(dispatcher):
-        await db_async.close_pool()
+        await close_pool()
     dp.startup.register(on_startup)
     dp.shutdown.register(on_shutdown)
 
@@ -202,7 +203,7 @@ async def main():
         if not telegram_id:
             await message.answer("Не удалось определить ваш Telegram ID.")
             return
-        courses = await db_async.fetch_user_courses(telegram_id)
+        courses = await fetch_user_courses(telegram_id)
         if not courses:
             await message.answer("У вас нет купленных курсов.")
         else:

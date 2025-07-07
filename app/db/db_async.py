@@ -2,7 +2,7 @@
 import asyncio
 from contextlib import asynccontextmanager
 import aiomysql
-import config  # <-- вместо повторного load_dotenv
+from app.config.config import DB_HOST, DB_PORT, DB_USER, DB_PASSWORD, DB_NAME, DB_CHARSET
 
 _pool_lock = asyncio.Lock()
 _DB_POOL = None
@@ -10,12 +10,12 @@ _DB_POOL = None
 
 async def _create_pool():
     return await aiomysql.create_pool(
-        host=config.DB_HOST,
-        port=int(config.DB_PORT or 3306),
-        user=config.DB_USER,
-        password=config.DB_PASSWORD,
-        db=config.DB_NAME,
-        charset=getattr(config, "DB_CHARSET", "utf8mb4"),
+        host=DB_HOST,
+        port=int(DB_PORT or 3306),
+        user=DB_USER,
+        password=DB_PASSWORD,
+        db=DB_NAME,
+        charset=DB_CHARSET,
         autocommit=True,
         connect_timeout=5,
         cursorclass=aiomysql.DictCursor,  # курсоры сразу dict
@@ -30,7 +30,7 @@ async def init_pool():
     if _DB_POOL is None:
         async with _pool_lock:
             if _DB_POOL is None:          # двойная проверка
-                missing = [k for k in ("DB_HOST", "DB_USER", "DB_PASSWORD", "DB_NAME") if not getattr(config, k)]
+                missing = [k for k in ("DB_HOST", "DB_USER", "DB_PASSWORD", "DB_NAME") if not globals().get(k)]
                 if missing:
                     raise RuntimeError(f"Отсутствуют переменные окружения: {', '.join(missing)}")
                 _DB_POOL = await _create_pool()

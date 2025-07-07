@@ -1,3 +1,4 @@
+# .github/workflows/deploy.yml
 name: CI & Deploy Bot
 
 on:
@@ -9,51 +10,56 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    # 1) Забираем код, чтобы запустить локальные тесты (опц.)
+    # ---------- 1. Забрать код на GitHub-runner ----------
     - name: Checkout repository
       uses: actions/checkout@v3
 
-    # 2) Ставим Python – нужен только для тестов на runner’е
-    - name: Set up Python
+    # ---------- 2. Поднять локальный Python (только для тестов) ----------
+    - name: Set up Python for tests
       uses: actions/setup-python@v4
       with:
         python-version: '3.x'
 
-    # 3) Ставим зависимости и (опц.) запускаем pytest
+    # ---------- 3. Установить зависимости и (опц.) запустить тесты ----------
     - name: Install dependencies & run tests
       run: |
         python -m pip install -U pip
         pip install -r requirements.txt
-        # убери следующую строку, если тестов нет
-        pytest -q || true                # не валим workflow, если тесты падают
+        # pytest -q                 # раскомментируй, если есть тесты
 
-    # 4) Деплой на Beget по SSH
-    - name: Deploy via SSH
+    # ---------- 4. Деплой на VPS ----------
+    - name: Deploy to VPS via SSH
       uses: appleboy/ssh-action@v0.1.7
       with:
-        host: 46.173.27.175
-        username: root
-        key: ${{ secrets.SERVER_SSH_KEY }}
+        host: 46.173.27.175              # IP или DNS твоего сервера
+        username: root                   # или другой SSH-пользователь
+        key: ${{ secrets.SERVER_SSH_KEY }}   # приватный ключ в Secrets
         script: |
-          set -e                            # если любая команда упадёт → красный билд
+          set -e
 
-          # ⬇︎ 1. кладём/обновляем репозиторий
-          if [ ! -d /home/velocity_bot/.git ]; then
-            git clone [email protected]:kiruxachips/velocity.git /home/velocity_bot
+          CODE_DIR=/home/velocity_bot/app      # папка с кодом
+          VENV_DIR=/home/velocity_bot/.venv    # виртуалка рядом
+
+          # 0) Остановить сервис, если он запущен
+          systemctl stop velocitybot.service || true
+
+          # 1) Клонировать или жёстко обновить репозиторий
+          if [ ! -d "$CODE_DIR/.git" ]; then
+            git clone --depth 1 git@github.com:kiruxachips/velocity.git "$CODE_DIR"
           else
-            cd /home/velocity_bot
-            git pull origin main
+            cd "$CODE_DIR"
+            git fetch --all
+            git reset --hard origin/main
+            git clean -fdx                  # удалить всё незакоммиченноe
           fi
 
-          # ⬇︎ 2. создаём venv один раз и обновляем зависимости
-          cd /home/velocity_bot
-          if [ ! -d venv ]; then
-            python3 -m venv venv
+          # 2) Создать venv один раз и обновить зависимости
+          if [ ! -d "$VENV_DIR" ]; then
+            python3 -m venv "$VENV_DIR"
           fi
-          source venv/bin/activate
+          source "$VENV_DIR/bin/activate"
           pip install -U pip
-          pip install -r requirements.txt
+          pip install -r "$CODE_DIR/requirements.txt"
 
-          # ⬇︎ 3. рестартуем службу
+          # 3) Запустить (или перезапустить) сервис
           systemctl restart velocitybot.service
-
