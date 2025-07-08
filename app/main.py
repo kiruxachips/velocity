@@ -4,7 +4,6 @@ import asyncio
 import logging
 
 from yookassa import Configuration, Payment
-import config
 
 from aiogram import types
 from aiogram.client.bot import Bot
@@ -20,7 +19,7 @@ from aiogram.fsm.storage.memory import MemoryStorage
 from aiogram import Dispatcher
 from aiogram.client.default import DefaultBotProperties
 
-from app.config.config import TELEGRAM_TOKEN, YOOKASSA_PROVIDER_TOKEN, YOOKASSA_SHOP_ID, YOOKASSA_SECRET_KEY
+from app.config.config import TELEGRAM_TOKEN, YOOKASSA_SHOP_ID, YOOKASSA_SECRET_KEY
 from app.db.db_async import init_pool, close_pool, fetch_user_courses
 from app.handlers.quiz import register_quiz
 
